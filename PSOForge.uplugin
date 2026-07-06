@@ -1,0 +1,41 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "PSOForge",
+	"Description": "Developer-side PSO capture tool. Cycles every scalability preset in a cooked build while -logPSO recording is active, rendering all project materials and Niagara systems on representative geometry so real draw PSOs are created and recorded for a bundled PSO cache. Excluded from Shipping builds.",
+	"Category": "Rendering",
+	"CreatedBy": "PSOForge contributors",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "PSOForge",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"TargetConfigurationAllowList": [
+				"Debug",
+				"DebugGame",
+				"Development",
+				"Test"
+			]
+		},
+		{
+			"Name": "PSOForgeRuntime",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		}
+	]
+}
