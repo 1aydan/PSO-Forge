@@ -103,6 +103,22 @@ Subclass `UPSOForgeWarmupWidget` (module `PSOForgeRuntime`) in UMG for your boot
 - `MinDisplaySeconds` avoids a one-frame flash when nothing is pending; `MaxCompilationTimeSeconds`
   is a safety timeout so a bad cache state can never trap the player.
 
+## In-editor cache builder
+
+**Tools → PSOForge Cache Builder** (module `PSOForgeEditor`) converts recordings without touching
+the command line:
+
+- Recordings come from a dev-managed folder list (persisted per project): add any folder — build
+  roots are scanned recursively for `.rec.upipelinecache`, so cooked builds can live anywhere.
+  `.shk` stable keys are picked up from the last cook automatically.
+- Pick the shader format, press **Build Cache** — the `ShaderPipelineCacheTools expand` commandlet
+  runs as a background process with its output streamed into the panel, so the editor stays
+  responsive.
+- With "Deploy" checked the resulting `.spc` lands in `Build/Windows/PipelineCaches/` ready for the
+  next package; unchecked it stays in `Saved/PSOForge/`.
+
+The PowerShell script remains the headless/CI path; both produce identical bundles.
+
 ## Verifying the bundle
 
 1. Package with the `.spc` present; the build log should open the pipeline cache and drain
