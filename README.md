@@ -81,6 +81,17 @@ Manual/console usage inside any cooked build launched with `-logPSO`:
 Launching the game with `-PSOForge` auto-starts the capture after the first map loads and quits the
 process when done (this is what the script uses).
 
+### Bonus: warming the editor
+
+Running `PSOForge.Start` in a **PIE session** doubles as an editor shader warmer: no PSOs are
+recorded (the bundled-cache pipeline only exists in cooked builds — the overlay will say
+"recording OFF"), but the sweep force-compiles every material into the DDC and creates their
+driver-side PSOs, which eliminates editor compile/first-draw hitches on that machine until shaders
+are invalidated. Note the preset sweep only adds editor value for materials using Quality Switch
+nodes; for a quick warmup, temporarily trim `QualityPresets` to your working preset in Project
+Settings. For team-wide editor warmth, prefer a shared DDC (+ a nightly
+`DerivedDataCacheCommandlet` fill) — this command warms the local machine only.
+
 ### Capture details
 
 - Batch-outer / preset-inner loop: each material batch is loaded once, spawned once, then rendered
