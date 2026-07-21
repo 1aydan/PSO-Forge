@@ -18,11 +18,16 @@
     .\Invoke-PSOForge.ps1 -ProjectFile F:\Work\MyGame\MyGame.uproject
 .EXAMPLE
     .\Invoke-PSOForge.ps1 -ProjectFile F:\Work\MyGame\MyGame.uproject -SkipCook -KeepRecordings
+.EXAMPLE
+    # Source-build engine + project with multiple game targets. -EngineDir accepts either the
+    # install root or the Engine\ folder itself; -Target picks which game target to cook.
+    .\Invoke-PSOForge.ps1 -EngineDir F:\UE5 -Target MyGame
 #>
 [CmdletBinding()]
 param(
     [string]$ProjectFile,
     [string]$EngineDir,
+    [string]$Target,
     [switch]$SkipCook,
     [string]$StagedDir,
     [ValidateSet('Development', 'DebugGame', 'Test')]
@@ -66,20 +71,52 @@ if (-not $OutputDir) { $OutputDir = Join-Path $ProjectRoot 'Saved\PSOForge' }
 Info "Project: $ProjectName ($ProjectFile)"
 
 # ---- Locate engine --------------------------------------------------------
-if (-not $EngineDir) {
+# The engine "root" is the directory that *contains* the Engine\ folder (so that
+# Engine\Build\BatchFiles\RunUAT.bat resolves). Given any candidate, return that root
+# whether the caller pointed at the root itself or directly at the Engine\ folder.
+function Resolve-EngineRoot([string]$Candidate) {
+    if (-not $Candidate) { return $null }
+    if (-not (Test-Path $Candidate)) { return $null }
+    $Candidate = (Resolve-Path $Candidate).Path
+    # Caller passed the install root (contains Engine\...).
+    if (Test-Path (Join-Path $Candidate 'Engine\Build\BatchFiles\RunUAT.bat')) { return $Candidate }
+    # Caller pointed directly at the Engine\ folder — step up one level.
+    if (Test-Path (Join-Path $Candidate 'Build\BatchFiles\RunUAT.bat')) { return (Split-Path $Candidate -Parent) }
+    return $null
+}
+
+$EngineRoot = $null
+if ($EngineDir) {
+    $EngineRoot = Resolve-EngineRoot $EngineDir
+    if (-not $EngineRoot) { Fail "No engine found at -EngineDir '$EngineDir' (looked for Engine\Build\BatchFiles\RunUAT.bat)." }
+}
+
+# Registry lookup by EngineAssociation (installed + registered source builds).
+if (-not $EngineRoot) {
     $Association = (Get-Content $ProjectFile -Raw | ConvertFrom-Json).EngineAssociation
     if ($Association) {
         $Reg = Get-ItemProperty "HKLM:\SOFTWARE\EpicGames\Unreal Engine\$Association" -ErrorAction SilentlyContinue
-        if ($Reg) { $EngineDir = $Reg.InstalledDirectory }
-        if (-not $EngineDir) {
+        if ($Reg) { $EngineRoot = Resolve-EngineRoot $Reg.InstalledDirectory }
+        if (-not $EngineRoot) {
             $Builds = Get-ItemProperty 'HKCU:\SOFTWARE\Epic Games\Unreal Engine\Builds' -ErrorAction SilentlyContinue
-            if ($Builds -and $Builds.$Association) { $EngineDir = $Builds.$Association }
+            if ($Builds -and $Builds.$Association) { $EngineRoot = Resolve-EngineRoot $Builds.$Association }
         }
     }
 }
-if (-not $EngineDir -or -not (Test-Path $EngineDir)) {
-    Fail 'Engine directory not found. Pass -EngineDir <UE install root>.'
+
+# Source-build fallback: walk up from the project looking for a sibling/ancestor Engine\ tree.
+if (-not $EngineRoot) {
+    $Probe = $ProjectRoot
+    while ($Probe -and -not $EngineRoot) {
+        $EngineRoot = Resolve-EngineRoot $Probe
+        $Probe = Split-Path $Probe -Parent
+    }
 }
+
+if (-not $EngineRoot) {
+    Fail 'Engine directory not found. Pass -EngineDir <UE install root or its Engine folder>.'
+}
+$EngineDir = $EngineRoot
 $RunUAT = Join-Path $EngineDir 'Engine\Build\BatchFiles\RunUAT.bat'
 $EditorCmd = Join-Path $EngineDir 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 foreach ($Required in @($RunUAT, $EditorCmd)) {
@@ -90,17 +127,25 @@ Info "Engine: $EngineDir"
 # ---- Cook / stage ----------------------------------------------------------
 if (-not $StagedDir) { $StagedDir = Join-Path $ProjectRoot 'Saved\StagedBuilds\Windows' }
 
+# The staged binary is named after the build target; it only differs from the project name
+# when an explicit -Target is given (e.g. a project with multiple game targets).
+$BinaryName = if ($Target) { $Target } else { $ProjectName }
+
 if (-not $SkipCook) {
     Info "Cooking and staging ($Configuration)... this can take a while."
-    & $RunUAT BuildCookRun "-project=$ProjectFile" -platform=Win64 "-clientconfig=$Configuration" `
-        -build -cook -stage -pak -iostore -nop4 -utf8output -unattended
+    $BcrArgs = @(
+        "-project=$ProjectFile", '-platform=Win64', "-clientconfig=$Configuration",
+        '-build', '-cook', '-stage', '-pak', '-iostore', '-nop4', '-utf8output', '-unattended'
+    )
+    if ($Target) { $BcrArgs += "-target=$Target" }
+    & $RunUAT BuildCookRun @BcrArgs
     if ($LASTEXITCODE -ne 0) { Fail "BuildCookRun failed with exit code $LASTEXITCODE." }
 }
 
-$GameExe = Join-Path $StagedDir "$ProjectName\Binaries\Win64\$ProjectName.exe"
+$GameExe = Join-Path $StagedDir "$ProjectName\Binaries\Win64\$BinaryName.exe"
 if (-not (Test-Path $GameExe)) {
     # DebugGame/Test binaries carry a suffix, e.g. MyGame-Win64-DebugGame.exe.
-    $GameExe = Get-ChildItem (Join-Path $StagedDir "$ProjectName\Binaries\Win64") -Filter "$ProjectName*.exe" -ErrorAction SilentlyContinue |
+    $GameExe = Get-ChildItem (Join-Path $StagedDir "$ProjectName\Binaries\Win64") -Filter "$BinaryName*.exe" -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty FullName
 }
 if (-not $GameExe -or -not (Test-Path $GameExe)) {
