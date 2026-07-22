@@ -48,6 +48,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Shader Compile")
 	int32 GetRemainingPrecompiles() const { return RemainingPrecompiles; }
+	
+	UFUNCTION(BlueprintPure, Category = "Shader Compile")
+	float GetElapsedSeconds() const { return ElapsedSeconds; }
 
 	UFUNCTION(BlueprintPure, Category = "Shader Compile")
 	bool IsShaderCompileActive() const { return bCompilationActive; }
@@ -60,6 +63,9 @@ protected:
 	/** Optional percent text binding. Name the UMG TextBlock TXT_ShaderProgress to auto-wire it. */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TXT_ShaderProgress;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TXT_ElapsedSeconds;
 
 	/** Start the shader pipeline cache pass as soon as the widget is constructed. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shader Compile")
@@ -84,6 +90,9 @@ protected:
 	/** Progress text format. {0} is rounded percent, {1} is remaining precompile count. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shader Compile|Text")
 	FText ProgressTextFormat = NSLOCTEXT("PSOForgeWarmup", "ProgressTextFormat", "{0}%");
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shader Compile|Text")
+	float ElapsedSeconds = 0.0f;
 
 	/** Blueprint hook for animated/styled progress updates beyond the optional bound widgets. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Shader Compile")
@@ -101,7 +110,6 @@ private:
 	int32 InitialPrecompileCount = 1;
 	int32 RemainingPrecompiles = 0;
 	float CurrentProgress = 0.0f;
-	float ElapsedSeconds = 0.0f;
 	bool bCompilationActive = false;
 	bool bCompilationCompleted = false;
 

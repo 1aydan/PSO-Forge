@@ -129,4 +129,10 @@ void UPSOForgeWarmupWidget::ApplyVisuals() const
 		TXT_ShaderProgress->SetText(FText::Format(ProgressTextFormat, FText::AsNumber(RoundedPercent), FText::AsNumber(RemainingPrecompiles)));
 		TXT_ShaderProgress->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
+	
+	if (TXT_ElapsedSeconds)
+	{
+		TXT_ElapsedSeconds->SetText(FText::AsTimespan(ElapsedSeconds));
+		TXT_ElapsedSeconds->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
 }
