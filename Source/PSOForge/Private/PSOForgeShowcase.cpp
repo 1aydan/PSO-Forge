@@ -87,7 +87,7 @@ TArray<UMaterialInterface*> APSOForgeShowcaseActor::BuildForMaterials(const TArr
 				PlaneComp->RegisterComponent();
 			}
 
-			if (SkeletalMesh && BaseMaterial->bUsedWithSkeletalMesh)
+			if (SkeletalMesh && BaseMaterial->GetUsageByFlag(MATUSAGE_SkeletalMesh))
 			{
 				USkeletalMeshComponent* SkelComp = NewObject<USkeletalMeshComponent>(this);
 				SkelComp->SetSkeletalMesh(SkeletalMesh);
@@ -103,7 +103,7 @@ TArray<UMaterialInterface*> APSOForgeShowcaseActor::BuildForMaterials(const TArr
 				SkelComp->RegisterComponent();
 			}
 
-			if (PrimaryMesh && BaseMaterial->bUsedWithInstancedStaticMeshes)
+			if (PrimaryMesh && BaseMaterial->GetUsageByFlag(MATUSAGE_InstancedStaticMeshes))
 			{
 				UInstancedStaticMeshComponent* ISMComp = NewObject<UInstancedStaticMeshComponent>(this);
 				ISMComp->SetStaticMesh(PrimaryMesh);

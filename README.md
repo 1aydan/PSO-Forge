@@ -26,6 +26,18 @@ The plugin has two modules:
   factories it ships on. PSOForge renders each material on static, plane, skeletal (when flagged),
   and instanced meshes, plus decal, post-process, and UI paths, and simulates Niagara systems.
 
+## Supported engine versions
+
+| Engine | Status |
+|---|---|
+| UE 5.8 | Supported |
+| UE 5.7 | Supported |
+| UE 5.6 and earlier | Untested |
+
+`main` builds against both 5.7 and 5.8 from the same source — the plugin ships no `EngineVersion`
+in its `.uplugin`, so it stays version-agnostic. If a future change forces 5.8-only APIs, a
+`release/5.7` branch will be cut from the last commit that still builds on 5.7.
+
 ## Setup
 
 1. Drop `PSOForge/` into your project's `Plugins/` folder and enable it in the `.uproject`.
