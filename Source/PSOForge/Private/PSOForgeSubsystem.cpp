@@ -23,6 +23,7 @@
 #include "Misc/PackageName.h"
 #include "NiagaraSystem.h"
 #include "PipelineFileCache.h"
+#include "RenderingThread.h"
 #include "ShaderPipelineCache.h"
 #include "TimerManager.h"
 #include "UObject/UObjectGlobals.h"
@@ -463,6 +464,15 @@ void UPSOForgeSubsystem::TickApplyingPreset()
 		Scalability::FQualityLevels Levels;
 		Levels.SetFromSingleQualityLevel(Settings->QualityPresets[PresetIndex]);
 		Scalability::SetQualityLevels(Levels);
+
+		// Scalability cvars are ECVF_RenderThreadSafe: their render-thread copies are written by an
+		// enqueued render command, unordered against work the in-flight frame already dispatched. A
+		// frame that straddles the change can set shadows up at one quality and project them at
+		// another - dropping to sg 0 (r.ShadowQuality=0) that way trips check(0) in the point-light
+		// branch of FProjectedShadowInfo::RenderPointLightProjection. Let the frame finish first so
+		// every preset is observed consistently end to end.
+		FlushRenderingCommands();
+
 		BroadcastProgress(FString::Printf(TEXT("Preset %d/%d (sg level %d)"),
 			PresetIndex + 1, Settings->QualityPresets.Num(), Settings->QualityPresets[PresetIndex]));
 	}
@@ -566,6 +576,7 @@ void UPSOForgeSubsystem::FinishCapture(bool bCancelled)
 	bWaitingForMapLoad = false;
 	TearDownStage();
 	Scalability::SetQualityLevels(SavedQualityLevels);
+	FlushRenderingCommands();
 
 	LoadedBatch.Reset();
 	if (BatchHandle.IsValid())
