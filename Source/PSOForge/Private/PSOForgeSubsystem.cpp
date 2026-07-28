@@ -461,17 +461,20 @@ void UPSOForgeSubsystem::TickApplyingPreset()
 	const UPSOForgeSettings* Settings = GetDefault<UPSOForgeSettings>();
 	if (Settings->QualityPresets.IsValidIndex(PresetIndex))
 	{
+		// Drain rendering *before* touching scalability. Scalability cvars are ECVF_RenderThreadSafe,
+		// so their non-game-thread copy is written by an enqueued render command while shadow setup
+		// (FSceneRenderer::CreateDynamicShadows, gated on GetShadowQuality() > 0) and shadow projection
+		// both read that copy from async worker tasks. A write landing between those two reads leaves a
+		// frame that built shadows at one quality and projects them at another; dropping to sg 0
+		// (r.ShadowQuality=0) that way reaches the unclamped 1..5 switch in
+		// FProjectedShadowInfo::RenderOnePassPointLightProjection and trips check(0). Flushing first
+		// means no frame is in flight when the write happens; flushing afterwards is too late.
+		FlushRenderingCommands();
+
 		Scalability::FQualityLevels Levels;
 		Levels.SetFromSingleQualityLevel(Settings->QualityPresets[PresetIndex]);
+		Levels.ShadowQuality = FMath::Max(Levels.ShadowQuality, Settings->MinShadowQuality);
 		Scalability::SetQualityLevels(Levels);
-
-		// Scalability cvars are ECVF_RenderThreadSafe: their render-thread copies are written by an
-		// enqueued render command, unordered against work the in-flight frame already dispatched. A
-		// frame that straddles the change can set shadows up at one quality and project them at
-		// another - dropping to sg 0 (r.ShadowQuality=0) that way trips check(0) in the point-light
-		// branch of FProjectedShadowInfo::RenderPointLightProjection. Let the frame finish first so
-		// every preset is observed consistently end to end.
-		FlushRenderingCommands();
 
 		BroadcastProgress(FString::Printf(TEXT("Preset %d/%d (sg level %d)"),
 			PresetIndex + 1, Settings->QualityPresets.Num(), Settings->QualityPresets[PresetIndex]));
@@ -575,8 +578,8 @@ void UPSOForgeSubsystem::FinishCapture(bool bCancelled)
 {
 	bWaitingForMapLoad = false;
 	TearDownStage();
-	Scalability::SetQualityLevels(SavedQualityLevels);
 	FlushRenderingCommands();
+	Scalability::SetQualityLevels(SavedQualityLevels);
 
 	LoadedBatch.Reset();
 	if (BatchHandle.IsValid())

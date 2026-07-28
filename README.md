@@ -157,6 +157,10 @@ The PowerShell script remains the headless/CI path; both produce identical bundl
   scripted flythrough of a real map (recordings accumulate across runs).
 - Windows/DX12 (`PCD3D_SM6`) is the tested path; other shader formats via `-ShaderFormat`.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

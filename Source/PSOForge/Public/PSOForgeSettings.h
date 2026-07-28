@@ -57,6 +57,16 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category = "Capture")
 	TArray<int32> QualityPresets;
 
+	/**
+	 * Floor applied to the shadow group of each swept preset. UE's point-light shadow projection
+	 * reads r.ShadowQuality independently of the setup pass that gates on it, and hits an unclamped
+	 * check(0) if it ever observes 0, so sweeping shadow quality down to 0 can abort the capture.
+	 * A shadow quality of 0 draws no shadow projections and therefore contributes no PSOs anyway,
+	 * so the default floor of 1 costs nothing real. Set to 0 to sweep the raw preset value.
+	 */
+	UPROPERTY(EditAnywhere, Config, Category = "Capture", meta = (ClampMin = 0, ClampMax = 5))
+	int32 MinShadowQuality = 1;
+
 	/** Safety timeout for draining pipeline precompiles per batch/preset. */
 	UPROPERTY(EditAnywhere, Config, Category = "Capture", meta = (ClampMin = 1.0))
 	float PrecompileDrainTimeoutSeconds = 60.0f;
