@@ -15,11 +15,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnShaderCompileCompleted);
 /**
  * Startup/loading-screen widget that drives the shader pipeline cache precompile pass: switches the
  * bundled PSO cache to fast batching, reports progress from the remaining precompile count, and
- * restores background batching when finished. Subclass in UMG (or C++) and optionally bind a
- * ProgressBar named PB_ShaderProgress and a TextBlock named TXT_ShaderProgress.
- *
- * This is the player-facing companion to the PSOForge capture tool: PSOForge produces the bundled
- * cache offline; this widget hides its precompile cost behind your boot or loading screen.
+ * restores background batching when finished.
  */
 UCLASS(Abstract, BlueprintType, Blueprintable)
 class PSOFORGERUNTIME_API UPSOForgeWarmupWidget : public UUserWidget
@@ -87,6 +83,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shader Compile", meta = (ClampMin = "0.0"))
 	float MaxCompilationTimeSeconds = 60.0f;
 
+	/** Ceiling on progress while warmup runs, so the bar cannot read full before it is. 1.0 disables it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shader Compile", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float MaxInProgressFraction = 0.98f;
+
 	/** Progress text format. {0} is rounded percent, {1} is remaining precompile count. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Shader Compile|Text")
 	FText ProgressTextFormat = NSLOCTEXT("PSOForgeWarmup", "ProgressTextFormat", "{0}%");
@@ -107,11 +107,17 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
-	int32 InitialPrecompileCount = 1;
+	/** High-water mark of the remaining count, used as the progress denominator. */
+	int32 InitialPrecompileCount = 0;
 	int32 RemainingPrecompiles = 0;
 	float CurrentProgress = 0.0f;
 	bool bCompilationActive = false;
 	bool bCompilationCompleted = false;
+	/** Cached FShaderPipelineCache::IsPrecompiling(). */
+	bool bPipelineCachePrecompiling = false;
+
+	/** Remaining bundled-cache precompiles, excluding runtime PSO precache requests. */
+	static int32 GetRemainingPreCompiles();
 
 	void UpdateProgress();
 	void ApplyVisuals() const;
