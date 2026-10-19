@@ -202,16 +202,34 @@ $RecFiles = $RecFiles | Where-Object Length -gt 0
 if (-not $RecFiles) {
     Fail "No non-empty .rec.upipelinecache recordings found in: $($RecSources -join '; ')"
 }
+# Clear stale recordings from an earlier run — a half-finished run leaves them behind and they
+# would silently be folded into this run's expand.
+Get-ChildItem $RecDir -Filter '*.rec.upipelinecache' -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force -Confirm:$false
 $RecFiles | Copy-Item -Destination $RecDir -Force
 Info "Recordings harvested: $($RecFiles.Count) file(s), $([Math]::Round(($RecFiles | Measure-Object Length -Sum).Sum / 1KB)) KB total."
 
 # ---- Expand to bundled cache ----------------------------------------------
 $SpcFile = Join-Path $OutputDir "${ProjectName}_$ShaderFormat.spc"
 Info 'Running ShaderPipelineCacheTools expand...'
-& $EditorCmd $ProjectFile -run=ShaderPipelineCacheTools expand `
-    (Join-Path $RecDir '*.rec.upipelinecache') (Join-Path $ShkDir '*.shk') $SpcFile
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path $SpcFile)) {
-    Fail "ShaderPipelineCacheTools expand failed (exit $LASTEXITCODE)."
+# -unattended keeps Live Coding from starting: LiveCodingConsole.exe outlives the commandlet and
+# inherits its stdout, so a piped invocation (`& $EditorCmd ...`) never sees end-of-stream and
+# hangs after the work is done. zenserver.exe lingers the same way, so wait on the process handle
+# rather than on the output stream.
+$ExpandArgs = @(
+    "`"$ProjectFile`"", '-run=ShaderPipelineCacheTools', 'expand',
+    "`"$(Join-Path $RecDir '*.rec.upipelinecache')`"",
+    "`"$(Join-Path $ShkDir '*.shk')`"",
+    "`"$SpcFile`"",
+    '-unattended', '-nosplash', '-nop4', '-stdout'
+)
+$Expand = Start-Process -FilePath $EditorCmd -ArgumentList $ExpandArgs -NoNewWindow -PassThru
+if (-not $Expand.WaitForExit($TimeoutMinutes * 60 * 1000)) {
+    $Expand.Kill()
+    Fail "ShaderPipelineCacheTools expand exceeded $TimeoutMinutes minutes and was killed."
+}
+if ($Expand.ExitCode -ne 0 -or -not (Test-Path $SpcFile)) {
+    Fail "ShaderPipelineCacheTools expand failed (exit $($Expand.ExitCode))."
 }
 Info "Bundled cache written: $SpcFile ($([Math]::Round((Get-Item $SpcFile).Length / 1KB)) KB)"
 

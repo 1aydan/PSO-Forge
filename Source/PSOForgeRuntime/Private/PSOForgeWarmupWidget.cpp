@@ -4,15 +4,34 @@
 
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
+#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "PipelineStateCache.h"
 #include "ShaderPipelineCache.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogPSOForgeWarmup, Log, All);
+
+bool UPSOForgeWarmupWidget::IsBundledCacheOnPrecacheThreadPool()
+{
+	// Mirrors UsePSOPrecachingThreadPool() in ShaderPipelineCache.cpp.
+	static const IConsoleVariable* CVarUsePrecachingThreadPool =
+		IConsoleManager::Get().FindConsoleVariable(TEXT("r.ShaderPipelineCache.UsePrecachingThreadPool"));
+	return PipelineStateCache::IsPSOPrecachingEnabled()
+		&& CVarUsePrecachingThreadPool != nullptr
+		&& CVarUsePrecachingThreadPool->GetInt() != 0;
+}
+
 int32 UPSOForgeWarmupWidget::GetRemainingPreCompiles()
 {
-	// NumPrecompilesRemaining() folds in runtime precache requests, which keep arriving and would hold
-	// the drain gate open long after the bundled cache is done.
 	const int32 Total = static_cast<int32>(FShaderPipelineCache::NumPrecompilesRemaining());
+
+	// On the thread pool the bundled cache's compiles only show up as precache requests, so keep them.
+	if (IsBundledCacheOnPrecacheThreadPool())
+	{
+		return Total;
+	}
+
+	// Runtime precache requests keep arriving and would hold the warmup open after the bundled cache is done.
 	const int32 RuntimePrecache = static_cast<int32>(PipelineStateCache::NumActivePrecacheRequests());
 	return FMath::Max(0, Total - RuntimePrecache);
 }
@@ -87,6 +106,16 @@ void UPSOForgeWarmupWidget::StartShaderCompile()
 	// InitialPrecompileCount once real work shows up.
 	RemainingPrecompiles = GetRemainingPreCompiles();
 	bPipelineCachePrecompiling = FShaderPipelineCache::IsPrecompiling();
+
+	// On the thread pool the calls above do nothing; the bundled cache was usually handed off during engine init.
+	static bool bWarnedThreadPoolHandOff = false;
+	if (!bWarnedThreadPoolHandOff && FPlatformProperties::RequiresCookedData() && !bPipelineCachePrecompiling && IsBundledCacheOnPrecacheThreadPool())
+	{
+		bWarnedThreadPoolHandOff = true;
+		UE_LOG(LogPSOForgeWarmup, Warning, TEXT("Bundled PSO cache was handed to the PSO precache thread pool during engine init, before this warmup started; ")
+			TEXT("progress only covers PSOs still compiling. For full coverage set r.ShaderPipelineCache.UsePrecachingThreadPool=0 ")
+			TEXT("and r.ShaderPipelineCache.StartupMode=0 so the cache waits for this widget."));
+	}
 
 	ApplyVisuals();
 	OnShaderProgressChanged.Broadcast(CurrentProgress, RemainingPrecompiles);

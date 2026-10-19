@@ -53,14 +53,14 @@ public:
 
 protected:
 	/** Optional progress bar binding. Name the UMG ProgressBar PB_ShaderProgress to auto-wire it. */
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly, Category = "Shader Compile", meta = (BindWidgetOptional))
 	TObjectPtr<UProgressBar> PB_ShaderProgress;
 
 	/** Optional percent text binding. Name the UMG TextBlock TXT_ShaderProgress to auto-wire it. */
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly, Category = "Shader Compile", meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TXT_ShaderProgress;
 	
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	UPROPERTY(BlueprintReadOnly, Category = "Shader Compile", meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TXT_ElapsedSeconds;
 
 	/** Start the shader pipeline cache pass as soon as the widget is constructed. */
@@ -116,7 +116,10 @@ private:
 	/** Cached FShaderPipelineCache::IsPrecompiling(). */
 	bool bPipelineCachePrecompiling = false;
 
-	/** Remaining bundled-cache precompiles, excluding runtime PSO precache requests. */
+	/** True when the bundled cache compiles through the PSO precache thread pool (the engine default with r.PSOPrecaching=1). */
+	static bool IsBundledCacheOnPrecacheThreadPool();
+
+	/** Remaining bundled-cache precompiles; runtime precache requests are only counted on the precache thread pool. */
 	static int32 GetRemainingPreCompiles();
 
 	void UpdateProgress();

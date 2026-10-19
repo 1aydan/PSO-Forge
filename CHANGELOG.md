@@ -3,6 +3,33 @@
 All notable changes to PSOForge are recorded here. Versions follow the `VersionName` field in
 `PSOForge.uplugin`.
 
+## 0.2.2
+
+### Fixed
+
+- **The warmup widget completed on its first tick in projects using the engine's default PSO
+  settings.** With `r.PSOPrecaching=1`, `r.ShaderPipelineCache.UsePrecachingThreadPool` (default
+  `1`) makes the shader pipeline cache ignore `StartupMode` and `SetBatchMode`. The cache hands
+  bundled PSOs to `PipelineStateCache::PrecacheGraphicsPipelineState` during engine init, in batches
+  of `r.ShaderPipelineCache.PSOPrecacheThreadPoolBatchSize` (500), and counts each one complete on
+  hand-off (`ShaderPipelineCache.cpp:1212`, `:1342`). A 4,000-PSO cache reported done 0.55s after
+  opening, seconds before the boot map loaded. From then on, the outstanding compiles exist only in
+  `PipelineStateCache::NumActivePrecacheRequests()`, and 0.2.1 subtracted exactly that count, so
+  the widget always read 0 remaining. In this mode the widget now counts those requests. Outside it,
+  the 0.2.1 behaviour is unchanged.
+- In that mode, the widget logs a one-time warning when it starts after the bundled cache has been
+  handed off, pointing at the cvars that make the cache wait for it.
+- `RunUAT BuildPlugin` failed in two places, both hidden when building inside a project. UHT
+  requires an explicit `Category` on the `BindWidgetOptional` widget properties for engine-installed
+  plugins, and `PSOForgeShowcase.cpp` used `EMaterialDomain` without including `MaterialDomain.h`,
+  which only compiled when unity builds pulled the header in.
+
+### Changed
+
+- README: documented `r.ShaderPipelineCache.UsePrecachingThreadPool=0` +
+  `r.ShaderPipelineCache.StartupMode=0` for warmup screens that should cover the whole bundled
+  cache, and the trade-off of starting the cache paused.
+
 ## 0.2.1
 
 ### Added

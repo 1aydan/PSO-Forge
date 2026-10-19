@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 3,
-	"VersionName": "0.2.1",
+	"Version": 4,
+	"VersionName": "0.2.2",
 	"FriendlyName": "PSOForge",
 	"Description": "Developer-side PSO capture tool. Cycles every scalability preset in a cooked build while -logPSO recording is active, rendering all project materials and Niagara systems on representative geometry so real draw PSOs are created and recorded for a bundled PSO cache. Excluded from Shipping builds.",
 	"Category": "Rendering",

@@ -82,7 +82,16 @@ Reuse an existing staged build with `-SkipCook`. See the script header for all p
 The resulting `Build/Windows/PipelineCaches/<Project>_<ShaderFormat>.spc` is picked up automatically
 by the next `BuildCookRun` package.
 
-Manual/console usage inside any cooked build launched with `-logPSO`:
+Manual/console usage inside a cooked build launched with:
+
+```
+-logPSO -dpcvars=r.PSOPrecaching=0,r.ShaderPipelineCache.ExcludePrecachePSO=0
+```
+
+Both cvars matter for coverage. The `[SystemSettings]` block above ships `ExcludePrecachePSO=1`,
+which is right for a shipping build but drops every PSO that runtime precaching already handled from
+the recording — and both are `ECVF_ReadOnly`, so they cannot be overridden from the console once the
+process is running. `Invoke-PSOForge.ps1` passes these automatically.
 
 | Command | Effect |
 |---|---|
@@ -125,6 +134,26 @@ Subclass `UPSOForgeWarmupWidget` (module `PSOForgeRuntime`) in UMG for your boot
   `bOpenLevelOnComplete`) travels onward when precompiles finish.
 - `MinDisplaySeconds` avoids a one-frame flash when nothing is pending; `MaxCompilationTimeSeconds`
   is a safety timeout so a bad cache state can never trap the player.
+
+### Making the bundled cache wait for the widget
+
+With `r.PSOPrecaching=1`, the engine default `r.ShaderPipelineCache.UsePrecachingThreadPool=1`
+routes the bundled cache through the PSO precache thread pool. In that mode the cache ignores
+`StartupMode` and batch modes, starts handing PSOs off during engine init (usually well before your
+boot map loads), and counts each one done on hand-off. The widget still works there: it counts the
+PSOs that are still compiling, plus any runtime precache requests, but it can't show work that
+finished before it was constructed. It logs a one-time warning when that happens.
+
+To have the warmup screen cover the whole bundled cache, add to `[SystemSettings]`:
+
+```ini
+r.ShaderPipelineCache.UsePrecachingThreadPool=0
+r.ShaderPipelineCache.StartupMode=0
+```
+
+`StartupMode=0` starts the cache paused, and `StartShaderCompile()` resumes it in Fast mode. Only
+use it if a warmup widget is guaranteed to run (for example on your `GameDefaultMap`); otherwise
+nothing resumes the cache and its PSOs compile on demand, with hitches.
 
 ## In-editor cache builder
 
